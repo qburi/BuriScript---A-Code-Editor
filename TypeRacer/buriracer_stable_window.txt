@@ -1,0 +1,330 @@
+from PyQt5.QtCore import *
+from PyQt5.Qsci import *
+from PyQt5.QtGui import *
+from PyQt5.QtWidgets import *
+import sys
+import threading
+from time import sleep, perf_counter, time
+
+correct_words_list_from_random: list = []
+typed_in_line_edit_from_random: list = []
+all_wpm_points: list = []
+
+
+class SubQLineEdit(QLineEdit):
+    # global correct_words_list_from_random, typed_in_line_edit_from_random
+
+    def __init__(self, parent):
+        super(SubQLineEdit, self).__init__(parent)
+        self.correct_words_list: list = []
+        self.typed_words_list: list = []
+
+    # def get_correct_and_typed_list(self, correct_list, typed_list) -> None:
+    #     try:
+    #         self.correct_list = correct_list
+    #         self.typed_list = typed_list
+    #     except Exception as error:
+    #         print(error)
+    #         # print(error.__class__.__name__, error)
+
+    def keyPressEvent(self, event) -> None:
+        # print(event.key())
+        # correct_words_list_from_random, typed_in_line_edit_from_random =  self.correct_list, self.typed_list
+        # print(self.text(), self.correct_list, self.typed_list)
+        # print(event.key())
+        try:
+            return super(SubQLineEdit, self).keyPressEvent(event)
+        finally:
+            # print("text is", self.text())
+            try:
+                if self.text().lstrip() not in self.correct_words_list[len(self.typed_words_list)][:
+                len(self.text().lstrip())]:
+                    self.setStyleSheet("background-color: #7a2721;"
+                                                       "color: white;"
+                                                       "border: 1px solid #5688b0;")
+                    # print(event.key(), ascii(self.correct_words_list[len(self.typed_words_list)]))
+                if not self.text().lstrip() or \
+                        self.correct_words_list[len(self.typed_words_list)][: len(self.text().lstrip())] \
+                        == self.text().lstrip():
+                    # print(self.text().lstrip() or \
+                    #     self.correct_words_list[len(self.typed_words_list)][: len(self.text().lstrip())] \
+                    #     == self.text().lstrip())
+                    self.setStyleSheet("background-color: #111111;"
+                                       "color: white;"
+                                       "border: 1px solid #5688b0;")
+                # if len(self.typed_words_list) == len(self.correct_words_list):
+                #     self.setStyleSheet("background-color: #111111;"
+                #                        "color: white;"
+                #                        "border: 1px;")
+                if event.key() == 32 and \
+                        self.correct_words_list[len(self.typed_words_list)][: len(self.text().lstrip())] ==\
+                        self.text().lstrip():
+                    self.setText('')
+                    pass
+            except Exception as error: pass
+                # print(error.__class__)
+
+
+class LiveWpmThread(QObject):
+    global typed_in_line_edit_from_random, correct_words_list_from_random
+
+    def __init__(self, correct_words_list: list, typed_word_list: list, live_wpm_label: QLabel, parent_thread: QThread,
+                 elapsed_time, text_edit: QLineEdit, focus_less_text_edit: QTextEdit):
+        super(LiveWpmThread, self).__init__(None)
+        self.__correct_words_list = correct_words_list
+        self.update_typed_words_list(typed_word_list)  # typed_word_list
+        self.__live_wpm_label = live_wpm_label
+        self.__parent_thread = parent_thread
+        self.start_timer = elapsed_time
+        self.start_style_function = True
+        self.__parent_line_edit = text_edit
+        self.frameless_disabled_text_edit = focus_less_text_edit
+
+    def calculate_live_wpm(self):
+        # if self.start_style_function:
+        #     self.start_style_function = False
+        #     self.check_empty_background()
+        if len(self.__typed_word_list) == len(self.__correct_words_list):
+            self.__parent_thread.exit()
+            self.start_style_function = True
+            # self.frameless_disabled_text_edit.setText('helsadkljh')
+            # print('exited')
+            return
+        number_of_characters_typed = sum([len(x) for x in self.__typed_word_list]) + len(self.__typed_word_list)
+        number_of_characters_in_words = sum([len(x) for x in self.__correct_words_list])
+        wpm = round(((number_of_characters_typed / 5) / (perf_counter() - self.start_timer)) * 60)
+        self.__live_wpm_label.setText(f"{wpm} wpm")
+        global all_wpm_points
+        all_wpm_points.append(wpm)
+        # if not self.__parent_line_edit.text().lstrip() or \
+        #         self.__correct_words_list[len(self.__typed_word_list)][: len(self.__parent_line_edit.text().lstrip())] \
+        #         == self.__parent_line_edit.text().lstrip():
+        #     self.__parent_line_edit.setStyleSheet("background-color: #111111;"
+        #                                           "color: white;"
+        #                                           "border: 1px solid #5688b0;")
+        if len(self.__typed_word_list) == len(self.__correct_words_list):
+            self.__parent_line_edit.setStyleSheet("background-color: #111111;"
+                                                  "color: white;"
+                                                  "border: 1px;")
+        sleep(0.1)
+        self.calculate_live_wpm()
+
+    def update_typed_words_list(self, updated_list):
+        self.__typed_word_list = updated_list
+        # print(self.__typed_word_list)
+
+    def check_empty_background(self):
+        if self.start_style_function:
+            print('thread exited')
+            self.__parent_thread.exit()
+            return
+        if not self.__parent_line_edit.text().lstrip() or \
+                self.__correct_words_list[len(self.__typed_word_list)][: len(self.__parent_line_edit.text().lstrip())]\
+                == self.__parent_line_edit.text().lstrip():
+            self.__parent_line_edit.setStyleSheet("background-color: #111111;"
+                                                  "color: white;"
+                                                  "border: 1px solid #5688b0;")
+        if len(self.__typed_word_list) == len(self.__correct_words_list):
+            self.__parent_line_edit.setStyleSheet("background-color: #111111;"
+                                                  "color: white;"
+                                                  "border: 1px;")
+        sleep(1)
+        # self.check_empty_background()
+
+
+class BuriRacerWindow(QMdiSubWindow):
+    def __init__(self):
+        super(BuriRacerWindow, self).__init__()
+        self.screen_geometry = QDesktopWidget().screenGeometry()
+        self.setGeometry(0, 0, self.screen_geometry.width(), self.screen_geometry.height())
+        self.setWindowTitle("BuriRacer")
+        # self.__frame = QFrame(self)
+        # self.__frame.setStyleSheet("background-color: #111111")
+        # self.__lyt = QVBoxLayout()
+        # self.__frame.setLayout(self.__lyt)
+        self.setStyleSheet("background-color: #111111")
+        self.setFont(QFont("JetBrains Mono"))
+        # self.setCentralWidget(self.__frame)
+        self.__text_edit = QTextEdit(self)
+        self.text_font = QFont("JetBrains Mono")
+        self.text_font.setPointSize(15)
+        self.__text_edit.setStyleSheet("color: white")
+        self.__text_edit.setFont(self.text_font)
+        self.__text_edit.setFrameShape(QFrame.NoFrame)
+        self.__text_edit.setReadOnly(True)
+        self.__text_edit.setDisabled(True)
+        self.__text_edit.setFixedSize(800, 500)
+        self.__text_edit.move(int(self.screen_geometry.width() / 2) - 400, 200)
+        # self.__lyt.addWidget(self.__text_edit)
+
+        self.type_line_edit = SubQLineEdit(self)
+        self.type_line_edit.setFixedWidth(500)
+        # self.__lyt.addWidget(self.type_line_edit)
+        self.type_line_edit.setFont(self.text_font)
+        self.type_line_edit.setStyleSheet("color: white")
+        self.type_line_edit.move(int(self.screen_geometry.width() / 2) - 300, 550)
+        self.type_line_edit.installEventFilter(self)
+        self.typed_in_text_list: list = []
+        # self.correct_words_list: list = []
+        self.type_line_edit.returnPressed.connect(lambda: self.enter_pressed())
+        self.type_line_edit.setStyleSheet("border: 1px solid #5688b0;"
+                                          "color: white;")
+        self.__live_wpm_label = QLabel(self)
+        self.__live_wpm_label.setText("0 wpm")
+        self.__live_wpm_label.setStyleSheet("background-color: #111111;"
+                                            "color: white")
+        self.__live_wpm_label.setFont(self.text_font)
+        self.__live_wpm_label.move(self.screen_geometry.width() - 200, 200)
+        self.start_wpm_thread = QThread()
+        self.text_to_add = self.random_text().split()
+        first_word = self.text_to_add.pop(0)
+        first_word = r"<u>" + r"<font color=#67e06f>" + rf"{first_word}" + "</font>" + "</u>"
+        self.text_to_add = [first_word] + self.text_to_add
+        self.__text_edit.setText(' '.join(self.text_to_add))
+        self._escape_window = QShortcut(QKeySequence("Esc"), self)
+        self._escape_window.activated.connect(lambda: self.close_main_window())
+        self.showMaximized()
+        self.show()
+
+    def close_main_window(self):
+        if __name__ != "__main__":
+            import os
+            # os.system("start automations.exe")
+        self.close()
+
+    def closeEvent(self, *args, **kwargs):
+        super(BuriRacerWindow, self).closeEvent(*args, **kwargs)
+        from os import system
+        if __name__ != "__main__":
+            # system("start automations.exe")
+            pass
+
+    def enter_pressed(self):
+        print(self.typed_in_text_list)
+
+    def eventFilter(self, source, event):
+        if (event.type() == QEvent.KeyPress and
+                source is self.type_line_edit):
+            if self.type_line_edit.text().lstrip() not in self.correct_words_list[len(self.typed_in_text_list)][:
+               len(self.type_line_edit.text().lstrip())]:
+                self.type_line_edit.setStyleSheet("background-color: #7a2721;"
+                                                  "color: white;"
+                                                  "border: 1px solid #5688b0;")
+            # print('key press:', (event.key(), event.text()))
+            if event.key() == 32:
+                self.__live_wpm_class_instance = LiveWpmThread(self.correct_words_list, self.typed_in_text_list,
+                                                               self.__live_wpm_label, self.start_wpm_thread,
+                                                               perf_counter(), self.type_line_edit, self.__text_edit)
+                self.__live_wpm_class_instance.moveToThread(self.start_wpm_thread)
+                self.start_wpm_thread.started.connect(self.__live_wpm_class_instance.calculate_live_wpm)
+                self.start_wpm_thread.start()
+                try:
+                    if self.correct_words_list[len(self.typed_in_text_list)] != self.type_line_edit.text().lstrip():
+                        self.type_line_edit.setStyleSheet("background-color: #7a2721;"
+                                                          "color: white;"
+                                                          "border: 1px solid #5688b0;")
+                        # print(self.correct_words_list[len(self.typed_in_text_list)], \
+                        # self.type_line_edit.text().lstrip(), sep="")
+                    else:
+                        self.typed_in_text_list.append(self.type_line_edit.text().lstrip())
+                        from copy import deepcopy
+                        typed_in_line_edit_from_random = deepcopy(self.typed_in_text_list)
+                        # self.type_line_edit.get_correct_and_typed_list(self.correct_words_list, self.typed_in_text_list)
+                        self.type_line_edit.correct_words_list = self.correct_words_list
+                        self.type_line_edit.typed_words_list = self.typed_in_text_list
+                        self.type_line_edit.setText("")
+                        self.type_line_edit.setStyleSheet("background-color: #111111;"
+                                                          "color: white;"
+                                                          "border: 1px solid #5688b0;")
+                        self.__live_wpm_class_instance.update_typed_words_list(self.typed_in_text_list)
+                        if len(self.correct_words_list) == len(self.typed_in_text_list):
+                            self.type_line_edit.setDisabled(True)
+                            self.__text_edit.setText(' '.join(self.correct_words_list))
+                            self.type_line_edit.setStyleSheet('border: 1px')
+                            # self.plot_graph_matplotlib()
+
+                        import copy
+                        list_to_underline = copy.deepcopy(self.correct_words_list)
+                        list_to_underline[
+                            len(self.typed_in_text_list)] = r"<u>" + r"<font color=#67e06f>" + rf"{list_to_underline[len(self.typed_in_text_list)]}" + "</font>" + "</u>"
+                        self.__text_edit.setText(' '.join(list_to_underline))
+                except Exception as error:
+                    # print(self.correct_words_list)
+                    # print(self.correct_words_list)
+                    # print(error)
+                    pass
+        return super(BuriRacerWindow, self).eventFilter(source, event)
+        # t = QThread()
+        # # setDaemon=False to stop the thread after complete
+        # t.setDaemon(False)
+        # # starting the thread
+        # t.start()
+
+    def clear_line_edit(self):
+        self.type_line_edit.clear()
+
+    def plot_graph_matplotlib(self):
+        # self.__text_edit.setDisabled(True)
+        # self.__text_edit.setParent(None)
+        import matplotlib.pyplot as plt
+        from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+        from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
+        from matplotlib.figure import Figure
+        self.label = QLabel(self)
+        self.label.setText("0 wpm")
+        self.label.setStyleSheet("background-color: #111111;"
+                                 "color: white")
+        self.label.setFont(self.text_font)
+        self.label.move(self.screen_geometry.width() - 300, 200)
+        self.setStyleSheet('background-color: white;')
+    def random_text(self):
+        from random import choice, randint
+        len_choice = choice([1, 2, 3, 4])
+        # length = "short" if len_choice == 1 else "medium" if len_choice == 2 else "long" if len_choice == 3 else "custom"
+        mode = 'typeracer_database'
+        import csv
+        with open(rf"images_icons/settings.csv", mode="r") as csv_read:
+            csv_read_file = csv.reader(csv_read)
+            for x in csv_read_file:
+                if x[0] == "CUSTOM_RUN":
+                    mode = 'typeracer_database' if x[1] == "TypeRacer Database" else 'custom' if x[1] == "Custom Text" \
+                        else "Random Words"
+        # with open(f"{length}_text.txt", "r", encoding='utf-8') as f_read:
+        if not mode == "Random Words":
+            with open(f"{mode}_text.txt", "r", encoding="utf-8") as f_read:
+                # print(f_read.seek(randint(0, sum(1 for line in f_read))))
+                all_text = f_read.readlines()  # 12728 bytes
+                thing = ""
+                while not thing:
+                    thing = choice(all_text).lstrip()
+                # thing = 'there where thing'
+                self.correct_words_list = thing.split()
+                correct_words_list_from_random = self.correct_words_list
+                self.type_line_edit.correct_words_list = self.correct_words_list
+                self.type_line_edit.typed_words_list = self.typed_in_text_list
+                return thing
+        else:
+            from random import choice
+            random_words = [
+                            'a', 'about', 'all', 'also', 'and', 'as', 'at', 'be', 'because', 'but', 'by', 'can', 'come',
+                            'could', 'day', 'do', 'even', 'find', 'first', 'for', 'from', 'get', 'give', 'go', 'have',
+                            'he', 'her', 'here', 'him', 'his', 'how', 'I', 'if', 'in', 'into', 'it', 'its', 'just',
+                            'know', 'like', 'look', 'make', 'man', 'many', 'me', 'more', 'my', 'new', 'no', 'not',
+                            'now', 'of', 'on', 'one', 'only', 'or', 'other', 'our', 'out', 'people', 'say', 'see',
+                            'she', 'so', 'some', 'take', 'tell', 'than', 'that', 'the', 'their', 'them', 'then',
+                            'there', 'these', 'they', 'thing', 'think', 'this', 'those', 'time', 'to', 'two', 'up',
+                            'use', 'very', 'want', 'way', 'we', 'well', 'what', 'when', 'which', 'who', 'will', 'with',
+                            'would', 'year', 'you', 'your'
+                           ]
+            thing = ' '.join(choice(random_words) for x in range(50))
+            self.correct_words_list = thing.split()
+            # correct_words_list_from_random = self.correct_words_list
+            self.type_line_edit.correct_words_list = self.correct_words_list
+            self.type_line_edit.typed_words_list = self.typed_in_text_list
+            return thing
+
+
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    window = BuriRacerWindow()
+    sys.exit(app.exec_())
