@@ -1,0 +1,3 @@
+Updated on 03/27/2024, 11:12 A.M.
+Info: The editor now reads the file opened everytime the window is activated to avoid overwriting of new data
+Files affected: main.py (overrided eventFilter, added installEventFilter in __init__ method) - lines around 449

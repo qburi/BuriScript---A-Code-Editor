@@ -1,0 +1,17 @@
+Ctrl + ' 	         - Enclose selected text with single quotes                          - Deprecated
+Ctrl + Shift + '     - Enclose selected text with double quotes                          - Deprecated
+Ctrl + 9             - Enclose selected text with parenthesis                            - Deprecated
+Alt  + [             - Enclose selected text with Square Brackets (Ctrl + [ - go to ^)   - Deprecated
+Ctrl + {             - Enclose selected text with Braces                                 - Deprecated
+Ctrl + 3             - Comment/Uncomment selected text
+Ctrl + S             - Save
+Ctrl + O             - Open
+Ctrl + 1             - Zoom In/Out
+Ctrl + Shift + G     - Google
+Ctrl + F             - Search in File (RegEx not supported)
+Ctrl + 2             - Resize Window -> kwargs - ('half-right', 'default', 'quarter-top-left', 'quarter-top-right', 'quarter-bottom-left', 'half-left', 'quarter-bottom-right', 'half-top', 'half-bottom')
+Ctrl + B             - Run BuriRacer
+Ctrl + Alt + I       - Open Settings
+Ctrl + Alt + Up/Down - Toggle Multi-Cursor Editing
+Ctrl + G             - Go To Line
+Ctrl + F5            - Run File Directly from Console

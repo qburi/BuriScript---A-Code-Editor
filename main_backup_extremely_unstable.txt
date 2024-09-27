@@ -1,0 +1,871 @@
+import sys
+import PyQt5.Qsci
+from PyQt5.QtWidgets import *
+from PyQt5.QtCore import *
+from PyQt5.QtGui import *
+from PyQt5.Qsci import *
+import re
+import os
+from search_box import SearchText
+
+with open("images_icons\\previous_data_file.txt", "r") as file_to_read:
+    file_path_user_opened = file_to_read.readline()
+home_path: str = os.getcwd()
+
+
+def change_font_color_type(lexer_name, font_color_hex, enum_to_change):
+    lexer_name.setColor(QColor(f'{font_color_hex}'), enum_to_change)
+    lexer_name.setFont(QFont('JetBrains Mono'), enum_to_change)
+
+
+class CustomEditor(QsciScintilla):
+    def __init__(self, parent=None):
+        super(CustomEditor, self).__init__(parent)
+
+    def keyPressEvent(self, event):
+        selected_text = self.selectedText()
+        all_pairs = {
+            39: "'",
+            40: ")",
+            34: '"',
+            91: "]",
+            123: "}"
+        }
+        try:
+            return super(CustomEditor, self).keyPressEvent(event)
+        finally:
+            if event.key() in all_pairs:
+                self.insert(f"{selected_text}{all_pairs[event.key()]}")
+                if selected_text:
+                    [self.SendScintilla(QsciScintillaBase.SCI_CHARRIGHT)
+                     for x in f"{selected_text}{all_pairs[event.key()]}"]
+            from os.path import exists
+            global file_path_user_opened, home_path
+            print(file_path_user_opened, 'no')
+            if exists(file_path_user_opened) or file_path_user_opened != "":
+                with open(file_path_user_opened, "w") as file_to_write:
+                    file_to_write.write(self.text().replace('\r', ''))
+                    os.chdir(home_path)
+                    with open('images_icons\\previous_data_file.txt', 'w') as file_to_w:
+                        file_to_w.write(file_path_user_opened)
+
+
+class CustomMainWindow(QMainWindow):
+    def __init__(self):
+        super(CustomMainWindow, self).__init__(None)
+
+        screen = QDesktopWidget().screenGeometry()
+        self.setGeometry(0, 0, screen.width(), screen.height())
+        self.showMaximized()
+        self.setWindowTitle("BuriScript - A Text Editor")
+
+        self.__frm = QFrame(self)
+        self.__frm.setStyleSheet("""
+            QFrame {
+            background-color: #111111
+            color: white}""")
+        self.__frm.setStyleSheet("QWidget { background-color: #111111 }")
+        self.__lyt = QVBoxLayout()
+        self.__frm.setLayout(self.__lyt)
+        self.setCentralWidget(self.__frm)
+        self.__myFont = QFont("JetBrains Mono")
+        self.__myFont.setPointSize(12)
+
+        self.__btn = QPushButton("Close")
+        self.__btn.setFixedWidth(50)
+        self.__btn.setFixedHeight(50)
+        self.__btn.clicked.connect(self.__btn_action)
+        self.__button_font_size = QFont()
+        self.__button_font_size.setPointSize(10)
+        self.__btn.setFont(self.__button_font_size)
+        self.__btn.setStyleSheet("font: bold;"
+                                 "background-color: #111111;"
+                                 "width: 120px;"
+                                 "color: white")
+        # self.__lyt.addWidget(self.__btn)
+        self.setWindowIcon(QIcon(r"images_icons\python_darkgreen_lightgreen.png"))
+
+        """
+        -------------------------------------------------ADDING-TITLE-BAR-------------------------------------------
+        """
+        # import titlebar
+        # self.setWindowFlags(Qt.FramelessWindowHint)
+        # self.__titlebar = titlebar.Ui_Form(self)
+        # self.__lyt.setSpacing(0)
+        # self.__lyt.setContentsMargins(0, 0, 0, 0)
+        # self.__lyt.addWidget(self.__titlebar)
+        """
+        """
+        # QScintilla editor setup
+        # ------------------------
+
+        # Editor font
+        self.__editor_font = QFont("JetBrains Mono")
+        self.__editor_font.setPointSize(12)
+        self.__editor = CustomEditor()
+        self.set_text_in_editor()
+        # self.__editor.setEolMode(QsciScintilla.EolWindows)
+        self.setStyleSheet("""
+
+            QScrollBar:vertical {
+            border: none;
+            background: #111111;
+            width: 10px;
+            margin: 15px 0px 15px 0px;
+            border-radius: 0px;
+         }
+
+        /*  HANDLE BAR VERTICAL */
+        QScrollBar::handle:vertical {	
+            background-color: #323437;
+            min-height: 10px;
+            border-radius: 0px;
+        }
+        QScrollBar::handle:vertical:hover{	
+            background-color: #3f4040
+        ;
+        }
+        QScrollBar::handle:vertical:pressed {	
+            background-color: #3f4040;
+        }
+
+        /* BTN TOP - SCROLLBAR */
+        QScrollBar::sub-line:vertical {
+            border: none;
+            background-color: #323437;
+            height: 15px;
+            border-top-left-radius: 0px;
+            border-top-right-radius: 0px;
+            subcontrol-position: top;
+            subcontrol-origin: margin;
+        }
+        QScrollBar::sub-line:vertical:hover {	
+            background-color: #3f4040;
+        }
+        QScrollBar::sub-line:vertical:pressed {	
+            background-color: #3f4040;
+        }
+        /* BTN BOTTOM - SCROLLBAR */
+        QScrollBar::add-line:vertical {
+            border: none;
+            background-color: #323437;
+            height: 15px;
+            border-bottom-left-radius: 0px;
+            border-bottom-right-radius: 0px;
+            subcontrol-position: bottom;
+            subcontrol-origin: margin;
+        }
+        QScrollBar::add-line:vertical:hover {
+            background-color: #3f4040;
+        }
+        QScrollBar::add-line:vertical:pressed {
+            background-color: #3f4040;
+        }
+
+        /* RESET ARROW */
+        QScrollBar::up-arrow:vertical, QScrollBar::down-arrow:vertical {
+            background: none;
+        }
+        QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
+            background: #111111;
+        }
+
+
+
+        /* HORIZONTAL SCROLLBAR */
+        QScrollBar:horizontal{
+        border: 0px solid grey;
+        background: #111111;
+        height: 10px;
+        margin: 0px 20px 0 20px;            
+        }
+
+        QScrollBar::handle:horizontal {
+        background: #323437;
+        min-width: 20px;
+        }
+
+        QScrollBar::handle:horizontal:hover{
+        background: #3f4040;
+        }
+
+        QScrollBar::add-line:horizontal {
+        border: 0px solid grey;
+        background: #323437;
+        width: 20px;
+        subcontrol-position: right;
+        subcontrol-origin: margin;
+        }
+
+        QScrollBar::add-line:horizontal:hover{
+        background: #3f4040;
+        }
+
+        QScrollBar::sub-line:horizontal {
+        border: 0px solid grey;
+        background: #323437;
+        width: 20px;
+        subcontrol-position: left;
+        subcontrol-origin: margin;
+
+        }
+
+        QScrollBar::sub-line:horizontal:hover{
+        background: #3f4040;
+        }
+
+        QScrollBar::up-arrow:horizontal, QScrollBar::down-arrow:horizontal
+        {
+            background: none;
+            border: 0px;
+        }
+
+        QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal
+        {
+            background: #111111;
+            border: 0px;
+        }
+""")  # TODO: https://doc.qt.io/qtforpython/overviews/stylesheet-examples.html - check website and try changing scroll bar
+        self.__editor.setStyleSheet("""background-color: #111111;                                                
+                                       color: white;
+                                    """)  # HERE
+        self.__editor.setFrameShape(QFrame.NoFrame)
+        """
+
+        https://stackoverflow.com/questions/26311950/modify-qscintilla-python-lexar
+        https://web.archive.org/web/20111028050642/http://www.riverbankcomputing.com/static/Docs/QScintilla2/classQsciLexerPython.html
+        """
+        # from Pylexer import PyLexer
+        self.__lexer = QsciLexerPython(self.__editor)
+        self.__lexer.setDefaultPaper(QColor("#111111"))
+        self.__lexer.setDefaultColor(QColor("white"))
+        self.__lexer.setDefaultFont(QFont("JetBrains Mono"))
+        self.operator_font = QFont("Courier New")
+        self.operator_font.setPointSize(14)
+        change_font_color_type(self.__lexer, "#dc5cff", QsciLexerPython.Keyword)
+        change_font_color_type(self.__lexer, "#a1e5ff", QsciLexerPython.Number)
+        change_font_color_type(self.__lexer, "#bff765", QsciLexerPython.Comment)
+        change_font_color_type(self.__lexer, "#23a608", QsciLexerPython.UnclosedString)
+        change_font_color_type(self.__lexer, "#bff765", QsciLexerPython.CommentBlock)
+        change_font_color_type(self.__lexer, "#23a608", QsciLexerPython.DoubleQuotedString)
+        change_font_color_type(self.__lexer, "#23a608", QsciLexerPython.SingleQuotedString)
+        change_font_color_type(self.__lexer, "#23a608", QsciLexerPython.TripleDoubleQuotedString)
+        change_font_color_type(self.__lexer, "#23a608", QsciLexerPython.TripleSingleQuotedString)
+        change_font_color_type(self.__lexer, "#ccaa5c", QsciLexerPython.FunctionMethodName)
+        change_font_color_type(self.__lexer, "white", QsciLexerPython.Operator)
+        self.__lexer.setFont(self.operator_font, QsciLexerPython.Operator)
+        change_font_color_type(self.__lexer, "#68CEFE", QsciLexerPython.Identifier)
+        change_font_color_type(self.__lexer, "#68CEFE", QsciLexerPython.HighlightedIdentifier)
+        change_font_color_type(self.__lexer, "#f7ff57", QsciLexerPython.Decorator)
+        change_font_color_type(self.__lexer, "#23a608", QsciLexerPython.DoubleQuotedFString)
+        change_font_color_type(self.__lexer, "#23a608", QsciLexerPython.SingleQuotedFString)
+        change_font_color_type(self.__lexer, "#23a608", QsciLexerPython.TripleDoubleQuotedFString)
+        change_font_color_type(self.__lexer, "#23a608", QsciLexerPython.TripleSingleQuotedFString)
+        change_font_color_type(self.__lexer, "#f06e6e", QsciLexerPython.ClassName)
+        # change_font_color_type(self.__lexer, "red", QsciLexerPython.Inconsistent)
+        self.__lexer.setPaper(QColor("#660f00"), QsciLexerPython.UnclosedString)
+        """
+
+
+
+        """
+        self.__editor.setLexer(self.__lexer)
+        self.__editor.setUtf8(True)  # Set encoding to UTF-8
+        self.__editor.setFont(self.__editor_font)  # Will be overridden by lexer!
+        self.__editor.setIndentationsUseTabs(False)
+        self.__editor.setIndentationGuides(True)
+        self.__editor.setTabWidth(4)
+        # self.__editor.setIndentationWidth(4)
+        self.__editor.setCaretForegroundColor(QColor("white"))
+        self.__editor.setCaretLineVisible(True)
+        self.__editor.setCaretLineBackgroundColor(QColor("#333333"))
+        self.__editor.setAutoIndent(True)
+        self.__editor.setMarginType(0, self.__editor.NumberMargin)
+        self.__editor.setMarginWidth(0, "000000")
+        self.__editor.setMarginsFont(QFont("JetBrains Mono"))
+        self.__editor.setMarginsForegroundColor(QColor("white"))
+        self.__editor.setMarginsBackgroundColor(QColor("#111111"))
+
+        """
+
+        """
+        self.__api = QsciAPIs(self.__lexer)
+        with open("autocompletions.txt", "r") as pre_filled_auto_completions:
+            autocomplete_words = pre_filled_auto_completions.readlines()
+            pattern = re.compile(r"[^\n]")
+            without_new_line_autocomplete_words = []
+            for x in autocomplete_words:
+                delete_new_line = pattern.findall(x)
+                without_new_line_autocomplete_words.append(''.join(delete_new_line))
+            without_new_line_autocomplete_words = list(set(without_new_line_autocomplete_words))
+            for autocomplete_word in without_new_line_autocomplete_words:
+                self.__api.add(autocomplete_word)
+            self.__api.prepare()
+        self.__editor.setCallTipsStyle(QsciScintilla.CallTipsNone)
+        self.__editor.setCallTipsVisible(-1)
+        self.__editor.setCallTipsPosition(QsciScintilla.CallTipsBelowText)
+        self.__editor.setCallTipsBackgroundColor(QColor("#323437"))
+        self.__editor.setCallTipsForegroundColor(QColor("white"))
+        self.__editor.setCallTipsHighlightColor(QColor("#0060f0"))
+        self.__editor.setCallTipsVisible(False)
+        """
+
+
+        """
+        self.__editor.autoCompletionSource()
+        self.__editor.setAutoCompletionSource(QsciScintilla.AcsAll)
+        self.__editor.setAutoCompletionThreshold(1)
+        self.__editor.setAutoCompletionCaseSensitivity(True)
+        self.__editor.setAutoCompletionReplaceWord(True)
+        self.__editor.setCallTipsStyle(QsciScintilla.CallTipsNoAutoCompletionContext)
+        self.__editor.setBraceMatching(1)
+        self.__editor.setMatchedBraceBackgroundColor(QColor("#38543f"))
+        self.__editor.setUnmatchedBraceBackgroundColor(QColor("#6b2c2e"))
+        self.__editor.setMatchedBraceForegroundColor(QColor("white"))
+        self.__editor.setUnmatchedBraceForegroundColor(QColor("white"))
+
+        """ Auto completions Python """
+        import autocompletions_python as autopy
+        self.__auto_complete = autopy.AutoCompletion("This_is_a_file.py", self.__api)
+        self.__auto_complete.finished.connect(self.load_autocomplete)
+        self.__editor.cursorPositionChanged.connect(self._cursor_position_changed)
+        """
+
+        -------------------------SHORTCUTS------------------------------------------
+        """
+        # self.comment_region = QShortcut(QKeySequence("Ctrl+3"), self)
+        # self.comment_region.activated.connect(self.comment_out_selected_region)
+        self.enclose_single = QShortcut(QKeySequence("Ctrl+'"), self)
+        self.enclose_double = QShortcut(QKeySequence("Ctrl+Shift+'"), self)
+        self.enclose_parenthesis = QShortcut(QKeySequence("Ctrl+9"), self)
+        self.enclose_square = QShortcut(QKeySequence("Alt+["), self)
+        self.enclose_brace = QShortcut(QKeySequence("Ctrl+{"), self)
+        self.enclose_single.activated.connect(lambda: self.enclose_region_with_quotes("single"))
+        self.enclose_double.activated.connect(lambda: self.enclose_region_with_quotes("double"))
+        self.enclose_parenthesis.activated.connect(lambda: self.enclose_with_brackets("()"))
+        self.enclose_square.activated.connect(lambda: self.enclose_with_brackets("[]"))
+        self.enclose_brace.activated.connect(lambda: self.enclose_with_brackets("{}"))
+        """
+
+
+        """
+        self.__menu_bar: QMenuBar = 0
+        self.set_up_menu()
+        # self.__lyt.addWidget(self.__menu_bar)
+
+        self.oldPos = self.pos()
+        self.show()
+
+    def mousePressEvent(self, event):
+        self.oldPos = event.globalPos()
+
+    def mouseMoveEvent(self, event):
+        delta = QPoint(event.globalPos() - self.oldPos)
+        self.move(self.x() + delta.x(), self.y() + delta.y())
+        self.oldPos = event.globalPos()
+
+    def enclose_with_brackets(self, bracket_type):
+        bracket_to_enclose = bracket_type
+        text_to_enclose = self.__editor.selectedText()
+        if text_to_enclose:
+            text_to_enclose = f"{bracket_to_enclose[0]}{text_to_enclose}{bracket_to_enclose[1]}"
+            self.__editor.replaceSelectedText(text_to_enclose)
+
+    def enclose_region_with_quotes(self, quote_type):
+        text_to_enclose = self.__editor.selectedText()
+        if text_to_enclose:
+            text_to_enclose = f"'{text_to_enclose}'" if quote_type == "single" else f'"{text_to_enclose}"'
+            self.__editor.replaceSelectedText(text_to_enclose)
+
+    def _cursor_position_changed(self, line: int, index: int) -> None:
+        self.__auto_complete.get_completions(line + 1, index, self.__editor.text())
+
+    def load_autocomplete(self):
+        pass
+
+    def opendialog(self):
+        file_name = QFileDialog.getOpenFileName(self, "Open File", "", "All files (*);;Python File (*.py)")
+        with open(file_name[0], "r") as file_to_read:
+            self.__editor.setText(file_to_read.readline())
+            lines = file_to_read.readlines().pop(0)
+            for x in lines:
+                self.__editor.append(x)
+                print(x)
+            print(*file_to_read.readlines(), sep="")
+
+    def set_up_menu(self):
+        style_for_menu = """
+        QMenuBar {
+            background-color: #111111;
+            color: rgb(255,255,255);
+            border: 1px solid #000;
+        }
+
+        QMenuBar::item {
+            background-color: #111111;
+            color: rgb(255,255,255);
+        }
+
+        QMenuBar::item::selected {
+            background-color: #111111;
+        }
+
+        QMenu {
+            background-color: #111111;
+            color: rgb(255,255,255);
+            border: 1px solid #000;           
+        }
+
+        QMenu::item::selected {
+            background-color: rgb(30,30,30);
+        }
+    """
+        self.__menu_bar = QMenuBar(self)
+        self.__menu_bar.setStyleSheet(style_for_menu)
+        self.__menu_bar.setFont(QFont("JetBrains Mono"))
+        file_menu = self.__menu_bar.addMenu("File")
+        new_file = file_menu.addAction("New")
+        new_file.setShortcut("Ctrl+N")
+        new_file.triggered.connect(self.new_file)
+
+        open_file = file_menu.addAction("Open")
+        open_file.setShortcut("Ctrl+O")
+        open_file.triggered.connect(self.open_file)
+
+        save_file = file_menu.addAction("Save As")
+        save_file.setShortcut("Ctrl+S")
+        save_file.triggered.connect(self.save_file)
+
+        # menu_bar_2 = QMenuBar(self)
+        # menu_bar_2.setStyleSheet(style_for_menu)
+        # menu_bar_2.setFont(QFont("JetBrains Mono"))
+        edit_menu = self.__menu_bar.addMenu("Edit")
+        comment_region = edit_menu.addAction("Comment/Uncomment Region")
+        comment_region.setShortcut("Ctrl+3")
+        comment_region.triggered.connect(self.comment_out_selected_region)
+        search_text_in_code = edit_menu.addAction("Search Text")
+        search_text_in_code.setShortcut("Ctrl+F")
+        search_text_in_code.triggered.connect(self.find_text_in_code)
+        zoom_in_or_out = edit_menu.addAction("Zoom In/Out")
+        zoom_in_or_out.setShortcut("Ctrl+1")
+        zoom_in_or_out.triggered.connect(lambda: self.zoom_in_or_out())
+        perform_default_search = edit_menu.addAction("Google")
+        perform_default_search.setShortcut("Ctrl+G")
+        perform_default_search.triggered.connect(lambda: self.search_in_google())
+        resize_qmain_window = edit_menu.addAction("Resize Window")
+        resize_qmain_window.setShortcut("Ctrl+2")
+        resize_qmain_window.triggered.connect(lambda: self.resize_window())
+
+        # menu_bar_3 = QMenuBar(self)
+        # menu_bar_3.setStyleSheet(style_for_menu)
+        # menu_bar_3.setFont(QFont("JetBrains Mono"))
+        run_menu = self.__menu_bar.addMenu("Run")
+        run_file = run_menu.addAction("Run Python File")
+        run_file.setShortcut("F5")
+        run_file.triggered.connect(self.run_python_file)
+        run_buriracer = run_menu.addAction("Run BuriRacer!")
+        run_buriracer.setShortcut("Ctrl+B")
+        run_buriracer.triggered.connect(self.run_python_buriracer)
+
+        # menu_bar_4 = QMenuBar(self)
+        # menu_bar_4.setStyleSheet(style_for_menu)
+        # menu_bar_4.setFont(QFont("JetBrains Mono"))
+        help_menu = self.__menu_bar.addMenu("Help")
+        show_all_shortcuts = help_menu.addAction("Show Shortcuts")
+        show_all_shortcuts.triggered.connect(self.show_shortcuts_in_text_file)
+        find_documentation_help = help_menu.addAction("Find Module Documentation")
+        find_documentation_help.triggered.connect(self.find_asked_module)
+
+        screen_resolution = QDesktopWidget().screenGeometry()
+        self.__menu_bar.setFixedSize(screen_resolution.width(), 25)
+        self.__lyt.addWidget(self.__menu_bar)
+        # self.__lyt.addWidget(menu_bar_2)
+        # self.__lyt.addWidget(menu_bar_3)
+        # self.__lyt.addWidget(menu_bar_4)
+        self.__lyt.addWidget(self.__editor)
+        self.__editor.setGeometry(0, 0, screen_resolution.width() - 20, screen_resolution.height() - 180)
+        self.__editor.setFocus()
+
+    def new_file(self):
+        global file_path_user_opened
+        self.__editor.clear()
+        file_path_user_opened = ""
+        with open('images_icons\\previous_data_file.txt', 'w') as file_to_w:
+            file_to_w.write(file_path_user_opened)
+
+    def open_file(self):
+        file_name = QFileDialog.getOpenFileName(self, "Open", "", "Python File (*.py);; Text File (*.txt)")
+        if file_name[0]:
+            with open(file_name[0], "r") as file_to_read:
+                text_content = file_to_read.readlines()
+                global file_path_user_opened
+                file_path_user_opened = file_name[0]
+                global home_path
+                with open(f"{rf'{home_path}'}\\images_icons\\previous_data_file.txt", 'w') as file_to_w:
+                    file_to_w.write(file_path_user_opened)
+                if not text_content: return
+                self.__editor.setText(text_content[0])
+                text_content.pop(0)
+                for x in text_content:
+                    self.__editor.append(x)
+
+    def save_file(self):
+        global file_path_user_opened
+        save_editor_text = rf"{self.__editor.text()}"
+        save_editor_text = save_editor_text.replace("\r", "")
+        if not file_path_user_opened:
+            file_name = QFileDialog.getSaveFileName(self, "Save", "", "Python FIle (*.py);; Text File (*.py)")
+            if file_name[0]:
+                with open(f"{file_name[0]}", 'w') as file_write:
+                    file_write.write(save_editor_text)
+                    file_path_user_opened = file_name[0]
+                    with open('images_icons\\previous_data_file.txt', 'w') as file_to_w:
+                        file_to_w.write(file_path_user_opened)
+        else:
+            with open(f"{file_path_user_opened}", "w") as file_write:
+                file_write.write(save_editor_text)
+
+    def show_shortcuts_in_text_file(self):
+        global home_path
+        raw_home_to_txt_f = rf"{rf'{home_path}'}\all_editor_shortcuts_txt_file.txt"  # TODO: make help function in cmd
+        os.system(rf'"{raw_home_to_txt_f}"')
+
+    def find_asked_module(self):
+        search_box_object = SearchText()
+
+    def find_text_in_code(self):
+        import search_text_box
+        search_text_box.SearchTextLine(self.__editor, self)
+
+    def zoom_in_or_out(self):
+        self.__editor.setScrollWidthTracking(True)
+
+        class GetFontSize(SearchText):
+            def __init__(self, master_lexer, master_editor: QsciScintilla):
+                super(GetFontSize, self).__init__()
+                self.__change_font = QFont("JetBrains Mono")
+                self.__master_editor = master_editor
+                self._change_font_master_editor = master_lexer
+
+            def retranslateUi(self, nothing):
+                self.lineEdit.setPlaceholderText("Enter Font Size")
+
+            def enter_pressed(self):
+                self.__search = self.lineEdit.text()
+                self.close()
+                try:
+                    if int(self.__search) <= 0: return
+                    self.__change_font.setPointSize(int(self.__search))
+                    self.__master_editor.setMarginsFont(self.__change_font)
+                    operator_font = QFont("Courier New")
+                    self._change_font_master_editor.setFont(self.__change_font)
+                    operator_font.setPointSize(int(self.__search) + 2)
+                    self._change_font_master_editor.setFont(operator_font, QsciLexerPython.Operator)
+                except Exception:
+                    pass
+
+        zoom_in = GetFontSize(self.__lexer, self.__editor)
+
+    def search_in_google(self):
+
+        class GoogleSearch(SearchText):
+            def __init__(self, master_editor: QsciScintilla):
+                super(GoogleSearch, self).__init__()
+                self.__master_editor = master_editor
+                window_resolution = QDesktopWidget().screenGeometry()
+                self.move(round(window_resolution.width() / 2) - 200, round(window_resolution.height() / 2) - 50)
+
+            def retranslateUi(self, nothing):
+                self.lineEdit.setPlaceholderText("Google")
+
+            def enter_pressed(self):
+                self.__search = self.lineEdit.text()
+                self.close()
+                import webbrowser
+                webbrowser.open_new_tab(f"https://www.google.com.tr/search?q={self.__search}")
+
+        GoogleSearch(self.__editor)
+
+    def resize_window(self):
+
+        class ReSizeWindow(SearchText):
+            def __init__(self, master_window):
+                super(ReSizeWindow, self).__init__()
+                self.__master_window = master_window
+
+            def retranslateUi(self, nothing):
+                self.lineEdit.setPlaceholderText("Enter Resolution")
+
+            def enter_pressed(self):
+                self.__search = self.lineEdit.text()
+                self.close()
+                window_resolution = QDesktopWidget().screenGeometry()
+                keywords_resolution = {'half-right': (window_resolution.width() / 2, 0, window_resolution.width() / 2,
+                                                      window_resolution.height()),
+                                       'default': (0, 0, window_resolution.width() - 20, window_resolution.height()),
+                                       'quarter-top-left': (0, 0, window_resolution.width() / 2,
+                                                            window_resolution.height() / 2),
+                                       'quarter-top-right': (window_resolution.width() / 2, 0,
+                                                             window_resolution.width() / 2,
+                                                             window_resolution.height() / 2),
+                                       'quarter-bottom-left': (0, window_resolution.height() / 2,
+                                                               window_resolution.width() / 2,
+                                                               window_resolution.height() / 2),
+                                       'half-left': (0, 0, window_resolution.width() / 2, window_resolution.height()),
+                                       'quarter-bottom-right': (window_resolution.width() / 2,
+                                                                window_resolution.height() / 2,
+                                                                window_resolution.width() / 2,
+                                                                window_resolution.height() / 2),
+                                       'half-top': (0, 0, window_resolution.width(), window_resolution.height() / 2),
+                                       'half-bottom': (0, window_resolution.height() / 2,
+                                                       window_resolution.width(), window_resolution.height() / 2)
+                                       }
+                if self.__search.lower() in keywords_resolution:
+                    initial_pos_x, initial_pos_y, final_screen_width, final_screen_height = \
+                        keywords_resolution[self.__search.lower()]
+                    self.__master_window.setGeometry(int(initial_pos_x), int(initial_pos_y),
+                                                     int(final_screen_width), int(final_screen_height))
+                else:
+                    try:
+                        given_resolution: tuple = eval(self.__search)
+                        window_width, window_height = given_resolution
+                        self.__master_window.setGeometry(0, 0, window_width, window_height)
+                    except Exception:
+                        pass
+
+        ReSizeWindow(self)
+
+    def run_python_buriracer(self):
+        os.chdir(home_path)
+        from TypeRacer.buriracer_window import BuriRacerWindow
+        # os.system(r"taskkill /F /IM automations.exe /T")
+        BuriRacerWindow()
+        # os.system(r"start automations.exe")
+
+    def set_text_in_editor(self):
+        with open('images_icons\\previous_data_file.txt', "r") as file_to_read:
+            from os.path import exists
+            file_to_open = file_to_read.readline()
+            print(repr(file_to_open))
+            print(exists(file_to_open))
+            from pathlib import Path
+            path = Path(rf"{file_to_read.readline()}")
+            print(path.is_file())
+            if exists(file_to_open):
+                print("exists", file_to_open, "kasjd")
+                file_path_user_opened = file_to_open
+                print(file_path_user_opened)
+                if not exists(file_path_user_opened): return
+                with open(rf"{file_to_open}", "r") as file_to_read_to_editor:
+                    self.__editor.setText(''.join(file_to_read_to_editor.readlines()))
+
+    def comment_out_selected_region(self):
+        try:
+            selection = self.__editor.selectedText()
+            if selection:
+                # self.__editor.replaceSelectedText(commented_text)
+                selection_list = selection.split("\n")
+                ideal_number_of_comments = len(selection_list)
+                real_number_of_comments = 0
+                for x in selection_list:
+                    try:
+                        if x[0] == "#":
+                            real_number_of_comments += 1
+                    except IndexError:
+                        pass
+                if real_number_of_comments == ideal_number_of_comments:
+                    # print("There")
+                    # pattern = re.compile(r"[^#]\S+")
+                    # matches = pattern.findall(selection)
+                    # print(matches)
+                    # for match in matches:
+                    #     print(match)
+                    filtered = selection
+                    filtered = list(filter(lambda x: x != "# ", filtered))
+                    second_filter = list(filter(lambda x: x != "# " and x != "#", filtered))
+                    # print(second_filter)
+                    if second_filter[0] == " ":
+                        second_filter.pop(0)
+                    try:
+                        for x in enumerate(second_filter):
+                            if x[1] == " " and second_filter[x[0] - 1] == "\n":
+                                second_filter.pop(x[0])
+                    except IndexError:
+                        pass
+                    # print(''.join(second_filter))
+                    uncommented_text = ''.join(second_filter)
+                    self.__editor.replaceSelectedText(uncommented_text)
+                else:
+                    for x in enumerate(selection_list):
+                        selection_list[x[0]] = "# " + x[1]
+                    commented_selection = "\n".join(selection_list)
+                    self.__editor.replaceSelectedText(commented_selection)
+            else:
+                return
+        except Exception as error:
+            print(error)
+
+    def run_python_file(self):
+        import os
+        global file_path_user_opened, home_path
+        file_path_to_run = file_path_user_opened
+        if not file_path_user_opened: return
+        # text_in_unsaved = ""
+        with open(f"{file_path_to_run}", "r") as file_to_read_unsaved:
+            text_in_unsaved = ''.join(file_to_read_unsaved.readlines())
+            file_to_read_unsaved.close()
+            check_equality_editor_text = rf"{self.__editor.text()}"
+            check_equality_editor_text = check_equality_editor_text.replace("\r", "")
+            if check_equality_editor_text == text_in_unsaved:
+                # file_path_to_run = file_path_user_opened
+                filepath_ = file_path_to_run
+                os.chdir(home_path)
+                with open('images_icons\\previous_data_file.txt', 'w') as file_to_w:
+                    file_to_w.write(filepath_)
+                pattern_to_find_file_name = re.compile(r"[ \w-]+\.")
+                match_file_path = pattern_to_find_file_name.findall(filepath_)[0] + 'py'
+                path_without_file_name = filepath_
+                path_without_file_name = path_without_file_name.rsplit(match_file_path)
+
+                # print(path_without_file_name[0])
+                # print(match_file_path)
+
+                def run_function():
+                    os.chdir(rf"{path_without_file_name[0]}")
+                    os.system(rf'start python -i "{match_file_path}"')
+
+                import threading
+                thread = threading.Thread(target=run_function)
+                thread.start()
+
+            else:
+                from PyQt5 import QtCore, QtGui, QtWidgets
+
+                class Ui_MainWindow(object):
+                    def __init__(self, main_editor, global_file_path):
+                        self.chosen_file_path_which_is_opened_globally = global_file_path
+                        self.MainWindow = QtWidgets.QMainWindow()
+                        self.boolean_value_final = None
+                        self.main_editor = main_editor
+
+                    def setupUi(self):
+                        self.MainWindow.setObjectName("MainWindow")
+                        self.MainWindow.resize(218, 103)
+                        self.MainWindow.setWindowFlags(QtCore.Qt.FramelessWindowHint)
+                        self.MainWindow.setStyleSheet("background-color: #323437;")
+                        self.centralwidget = QtWidgets.QWidget(self.MainWindow)
+                        self.centralwidget.setObjectName("centralwidget")
+                        self.label = QtWidgets.QLabel(self.centralwidget)
+                        self.label.setGeometry(QtCore.QRect(10, 20, 201, 20))
+                        font = QtGui.QFont()
+                        font.setFamily("JetBrains Mono")
+                        font.setPointSize(12)
+                        self.label.setFont(font)
+                        self.label.setStyleSheet("background-color: #323437;\n"
+                                                 "color: white;")
+                        self.label.setObjectName("label")
+                        self.pushButton = QtWidgets.QPushButton(self.centralwidget)
+                        self.pushButton.setGeometry(QtCore.QRect(20, 50, 81, 31))
+                        font = QtGui.QFont()
+                        font.setFamily("JetBrains Mono")
+                        self.pushButton.setFont(font)
+                        self.pushButton.setStyleSheet("color: white")
+                        self.pushButton.setObjectName("pushButton")
+                        self.pushButton_2 = QtWidgets.QPushButton(self.centralwidget)
+                        self.pushButton_2.setGeometry(QtCore.QRect(110, 50, 91, 31))
+                        font = QtGui.QFont()
+                        font.setFamily("JetBrains Mono")
+                        self.pushButton_2.setFont(font)
+                        self.pushButton_2.setStyleSheet("color: white")
+                        self.pushButton_2.setObjectName("pushButton_2")
+                        self.MainWindow.setCentralWidget(self.centralwidget)
+                        self.statusbar = QtWidgets.QStatusBar(self.MainWindow)
+                        self.statusbar.setObjectName("statusbar")
+                        self.MainWindow.setStatusBar(self.statusbar)
+
+                        self.retranslateUi(self.MainWindow)
+                        QtCore.QMetaObject.connectSlotsByName(self.MainWindow)
+                        self.label.setText("Do you want to Save?")
+                        self.pushButton.setText("Save")
+                        self.pushButton_2.setText("Cancel")
+                        self.pushButton.clicked.connect(lambda: self.save_file_to_path())
+                        self.pushButton_2.clicked.connect(lambda: self.return_boolean(False))
+                        self.pushButton.setDefault(True)
+                        self.pushButton.setFocus()
+                        # self.pushButton.autoDefault()
+                        self.MainWindow.show()
+
+                    def retranslateUi(self, MainWindow):
+                        _translate = QtCore.QCoreApplication.translate
+                        # MainWindow.setWindowTitle(_translate("MainWindow", "MainWindow"))
+                        # self.label.setText(_translate("MainWindow", "Do you want to Save?"))
+                        # self.pushButton.setText(_translate("MainWindow", "Save"))
+                        # self.pushButton_2.setText(_translate("MainWindow", "Cancel"))
+
+                    def return_boolean(self, boolean_to_return):
+                        self.MainWindow.close()
+                        self.boolean_value_final = boolean_to_return
+                        # with open("boolean_value.txt", "w") as boolean_value:
+                        #     boolean_value.write(str(1 if boolean_to_return else 0))
+                        # return  # boolean_to_return
+
+                    def your_boolean_value(self):
+                        return self.boolean_value_final
+
+                    def save_file_to_path(self):
+                        global file_path_user_opened
+                        if not file_path_user_opened:
+                            # file_name = QFileDialog.getSaveFileName(self, "Save", "",
+                            #                                         "Python FIle (*.py);; Text File (*.py)")
+                            # if file_name[0]:
+                            #     with open(f"{file_name[0]}", 'w') as file_write:
+                            #         file_write.write(self.text_to_save_in_location)
+                            #         file_path_user_opened = file_name[0]
+                            pass
+                        else:
+                            with open(f"{file_path_user_opened}", "w") as file_write:
+                                editor_text_to_write = rf"{self.main_editor.text()}"
+                                editor_text_to_write = editor_text_to_write.replace("\r", "")
+                                file_write.write(editor_text_to_write)
+                                # print(editor_text_to_write)
+                                self.MainWindow.close()
+                                file_path_to_run_ = self.chosen_file_path_which_is_opened_globally
+                                filepath__ = file_path_to_run_
+                                os.chdir(home_path)
+                                with open('images_icons\\previous_data_file.txt', 'w') as file_to_w:
+                                    file_to_w.write(filepath__)
+                                pattern_to_find_file_name_ = re.compile(r"[ \w-]+\.")
+                                match_file_path_ = pattern_to_find_file_name_.findall(filepath__)[0] + 'py'
+                                path_without_file_name_ = filepath__
+                                path_without_file_name_ = path_without_file_name_.rsplit(match_file_path_)
+                                # print(path_without_file_name_[0])
+                                # print(match_file_path_)
+
+                                os.chdir(rf"{path_without_file_name_[0]}")
+                                os.system(rf'start python -i "{match_file_path_}"')
+                                file_write.close()
+
+                ui = Ui_MainWindow(self.__editor, file_path_user_opened)
+                ui.setupUi()
+
+    ''''''
+
+    def __btn_action(self):
+        # os.system(r"taskkill /F /IM automations.exe /T")
+        sys.exit(app.exec_())
+        QApplication.closeAllWindows()
+
+    ''''''
+
+
+''' End Class '''
+
+if __name__ == '__main__':
+    app = QApplication(sys.argv)
+    QApplication.setStyle(QStyleFactory.create('Fusion'))
+    myGUI = CustomMainWindow()
+    # os.system("start automations.exe")
+    app.exec_()
+    # os.system(r"taskkill /F /IM automations.exe /T")
+    sys.exit()
+''''''
